@@ -2,22 +2,68 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chain Reaction - Custom Setup</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Chain Reaction - Mobile Optimized</title>
     <style>
-        body { background: #111; color: white; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
-        #status { margin-bottom: 10px; font-size: 28px; font-weight: bold; letter-spacing: 2px; }
-        canvas { border: 2px solid #555; background: #000; box-shadow: 0 0 30px rgba(0,0,0,1); cursor: pointer; max-height: 70vh; }
-        .controls { margin-top: 20px; display: flex; gap: 15px; }
-        button { padding: 10px 20px; font-size: 16px; cursor: pointer; background: #333; color: white; border: 1px solid #666; border-radius: 4px; transition: 0.2s; }
-        button:hover { background: #444; border-color: #fff; }
+        :root {
+            --bg-color: #0a0a0a;
+            --panel-color: #1a1a1a;
+        }
+        body { 
+            background: var(--bg-color); 
+            color: white; 
+            font-family: 'Segoe UI', system-ui, sans-serif; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: space-between; 
+            /* Using dvh for dynamic viewport height */
+            height: 100dvh; 
+            margin: 0; 
+            overflow: hidden; 
+            padding: 10px 0;
+            box-sizing: border-box;
+        }
+        #status { 
+            font-size: clamp(20px, 5dvh, 28px); 
+            font-weight: bold; 
+            letter-spacing: 2px; 
+            height: 40px;
+        }
+        canvas { 
+            border: 1px solid #444; 
+            background: #000; 
+            box-shadow: 0 0 20px rgba(0,0,0,1); 
+            cursor: pointer;
+            /* Ensure canvas doesn't exceed the available space between header and buttons */
+            max-height: 70dvh; 
+            max-width: 95vw;
+            touch-action: none; /* Prevents scrolling while playing */
+        }
+        .controls { 
+            display: flex; 
+            gap: 10px; 
+            padding-bottom: 5px;
+        }
+        button { 
+            padding: 12px 20px; 
+            font-size: 14px; 
+            font-weight: bold;
+            cursor: pointer; 
+            background: var(--panel-color); 
+            color: white; 
+            border: 1px solid #444; 
+            border-radius: 8px; 
+            text-transform: uppercase;
+        }
+        button:active { background: #333; transform: scale(0.95); }
     </style>
 </head>
 <body>
     <div id="status">PLAYER 1</div>
-    <canvas id="gameBoard" width="400" height="600"></canvas>
+    <canvas id="gameBoard"></canvas>
     <div class="controls">
-        <button onclick="resetGame()">Reset Game</button>
+        <button onclick="resetGame()">Reset</button>
         <button onclick="newGame()">New Game</button>
     </div>
 
@@ -26,7 +72,6 @@ const canvas = document.getElementById('gameBoard');
 const ctx = canvas.getContext('2d');
 const statusDiv = document.getElementById('status');
 
-// Configuration
 let ROWS = 9;
 let COLS = 6;
 let CELL_SIZE = 0;
@@ -39,10 +84,23 @@ let isAnimating = false;
 let hasMoved = [];
 let gameOver = false;
 
+function resizeCanvas() {
+    // Dynamically calculate canvas width based on device width
+    const availableWidth = window.innerWidth * 0.95;
+    const availableHeight = window.innerHeight * 0.7; // 70dvh approximation
+    
+    // Calculate cell size based on which dimension is more restrictive
+    const cellW = availableWidth / COLS;
+    const cellH = availableHeight / ROWS;
+    CELL_SIZE = Math.min(cellW, cellH, 60); // Cap size for tablet/desktop
+    
+    canvas.width = COLS * CELL_SIZE;
+    canvas.height = ROWS * CELL_SIZE;
+}
+
 function initGrid() {
+    resizeCanvas();
     grid = [];
-    CELL_SIZE = canvas.width / COLS;
-    canvas.height = ROWS * CELL_SIZE; // Adjust canvas height based on aspect ratio
     for (let r = 0; r < ROWS; r++) {
         grid[r] = [];
         for (let c = 0; c < COLS; c++) {
@@ -63,24 +121,15 @@ function resetGame() {
 }
 
 function newGame() {
-    // 1. Get Player Count
-    const pInput = prompt("Enter number of players (2-6):", "2");
-    const pCount = parseInt(pInput);
-    if (isNaN(pCount) || pCount < 2 || pCount > 6) return alert("Invalid players!");
+    const pCount = parseInt(prompt("Players (2-6):", "2"));
+    if (isNaN(pCount) || pCount < 2 || pCount > 6) return;
 
-    // 2. Get Grid Size
-    const sizeInput = prompt(
-        "Choose Grid Size:\n1. Small (6x6)\n2. Medium (9x6 - Standard)\n3. Large (12x10)", 
-        "2"
-    );
-
+    const sizeInput = prompt("Size:\n1. Small (6x6)\n2. Medium (9x6)\n3. Large (12x10)", "2");
     switch(sizeInput) {
         case "1": COLS = 6; ROWS = 6; break;
         case "2": COLS = 6; ROWS = 9; break;
         case "3": COLS = 10; ROWS = 12; break;
-        default: alert("Defaulting to Medium"); COLS = 6; ROWS = 9;
     }
-
     playerCount = pCount;
     resetGame();
 }
@@ -92,7 +141,8 @@ class Particle {
         this.targetY = targetR * CELL_SIZE + CELL_SIZE / 2;
         this.targetR = targetR; this.targetC = targetC;
         this.color = color; this.owner = owner;
-        this.speed = 10; this.reached = false;
+        this.speed = CELL_SIZE / 6; 
+        this.reached = false;
     }
     update() {
         const dx = this.targetX - this.x;
@@ -102,7 +152,7 @@ class Particle {
         else { this.x += (dx / dist) * this.speed; this.y += (dy / dist) * this.speed; }
     }
     draw() {
-        ctx.shadowBlur = 15; ctx.shadowColor = this.color; ctx.fillStyle = this.color;
+        ctx.shadowBlur = 10; ctx.shadowColor = this.color; ctx.fillStyle = this.color;
         ctx.beginPath(); ctx.arc(this.x, this.y, CELL_SIZE/4, 0, Math.PI * 2);
         ctx.fill(); ctx.shadowBlur = 0;
     }
@@ -141,13 +191,13 @@ async function handleExplosion(r, c, playerId) {
         particles = particles.filter(item => item !== p);
     }
 
-    // Win Check mid-reaction
+    // Immediate Win Check
     if (hasMoved.every(m => m)) {
-        const activeOwners = new Set();
-        for (let row of grid) for (let col of row) if (col.owner !== -1) activeOwners.add(col.owner);
-        if (activeOwners.size === 1) {
-            const winner = [...activeOwners][0];
-            statusDiv.innerText = `PLAYER ${winner + 1} VICTORIOUS!`;
+        const owners = new Set();
+        for (let row of grid) for (let col of row) if (col.owner !== -1) owners.add(col.owner);
+        if (owners.size === 1) {
+            const winner = [...owners][0];
+            statusDiv.innerText = `WINNER: P${winner + 1}`;
             statusDiv.style.color = colors[winner];
             gameOver = true; isAnimating = false; particles = [];
             return;
@@ -159,7 +209,7 @@ async function handleExplosion(r, c, playerId) {
 
 function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.strokeStyle = '#444';
+    ctx.strokeStyle = '#333';
     for(let i=0; i<=COLS; i++) { ctx.beginPath(); ctx.moveTo(i*CELL_SIZE,0); ctx.lineTo(i*CELL_SIZE, canvas.height); ctx.stroke(); }
     for(let i=0; i<=ROWS; i++) { ctx.beginPath(); ctx.moveTo(0, i*CELL_SIZE); ctx.lineTo(canvas.width, i*CELL_SIZE); ctx.stroke(); }
 
@@ -174,11 +224,9 @@ function gameLoop() {
                     const angle = (Date.now() / 600) + (i * (Math.PI * 2 / cell.atoms));
                     const dist = cell.atoms > 1 ? CELL_SIZE/5 : 0;
                     ctx.beginPath();
-                    ctx.arc(cx + Math.cos(angle)*dist, cy + Math.sin(angle)*dist, CELL_SIZE/6, 0, Math.PI * 2);
+                    ctx.arc(cx + Math.cos(angle)*dist, cy + Math.sin(angle)*dist, CELL_SIZE/5, 0, Math.PI * 2);
                     ctx.fill();
-                    ctx.shadowBlur = 5; ctx.shadowColor = colors[cell.owner];
                 }
-                ctx.shadowBlur = 0;
             }
         }
     }
@@ -186,13 +234,13 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
-canvas.addEventListener('click', async (e) => {
+canvas.addEventListener('pointerdown', async (e) => { // Using pointerdown for better mobile response
     if (isAnimating || gameOver) return;
     const rect = canvas.getBoundingClientRect();
     const c = Math.floor((e.clientX - rect.left) / (rect.width / COLS));
     const r = Math.floor((e.clientY - rect.top) / (rect.height / ROWS));
     
-    if (grid[r][c].owner === -1 || grid[r][c].owner === currentPlayer) {
+    if (r >= 0 && r < ROWS && c >= 0 && c < COLS && (grid[r][c].owner === -1 || grid[r][c].owner === currentPlayer)) {
         isAnimating = true;
         grid[r][c].owner = currentPlayer;
         grid[r][c].atoms++;
@@ -208,6 +256,9 @@ canvas.addEventListener('click', async (e) => {
         }
     }
 });
+
+// Handle orientation changes
+window.addEventListener('resize', initGrid);
 
 resetGame();
 gameLoop();
