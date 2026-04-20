@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chain Reaction - Custom Setup</title>
+    <style>
+        body { background: #111; color: white; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
+        #status { margin-bottom: 10px; font-size: 28px; font-weight: bold; letter-spacing: 2px; }
+        canvas { border: 2px solid #555; background: #000; box-shadow: 0 0 30px rgba(0,0,0,1); cursor: pointer; max-height: 70vh; }
+        .controls { margin-top: 20px; display: flex; gap: 15px; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; background: #333; color: white; border: 1px solid #666; border-radius: 4px; transition: 0.2s; }
+        button:hover { background: #444; border-color: #fff; }
+    </style>
+</head>
+<body>
+    <div id="status">PLAYER 1</div>
+    <canvas id="gameBoard" width="400" height="600"></canvas>
+    <div class="controls">
+        <button onclick="resetGame()">Reset Game</button>
+        <button onclick="newGame()">New Game</button>
+    </div>
+
+<script>
+const canvas = document.getElementById('gameBoard');
+const ctx = canvas.getContext('2d');
+const statusDiv = document.getElementById('status');
+
+// Configuration
+let ROWS = 9;
+let COLS = 6;
+let CELL_SIZE = 0;
+const colors = ['#00f2ff', '#ff007b', '#00ff44', '#ffff00', '#ff8800', '#cc00ff'];
+let currentPlayer = 0;
+let playerCount = 2;
+let grid = [];
+let particles = [];
+let isAnimating = false;
+let hasMoved = [];
+let gameOver = false;
+
+function initGrid() {
+    grid = [];
+    CELL_SIZE = canvas.width / COLS;
+    canvas.height = ROWS * CELL_SIZE; // Adjust canvas height based on aspect ratio
+    for (let r = 0; r < ROWS; r++) {
+        grid[r] = [];
+        for (let c = 0; c < COLS; c++) {
+            grid[r][c] = { owner: -1, atoms: 0 };
+        }
+    }
+}
+
+function resetGame() {
+    initGrid();
+    currentPlayer = 0;
+    hasMoved = new Array(playerCount).fill(false);
+    isAnimating = false;
+    gameOver = false;
+    particles = [];
+    statusDiv.innerText = "PLAYER 1";
+    statusDiv.style.color = colors[0];
+}
+
+function newGame() {
+    // 1. Get Player Count
+    const pInput = prompt("Enter number of players (2-6):", "2");
+    const pCount = parseInt(pInput);
+    if (isNaN(pCount) || pCount < 2 || pCount > 6) return alert("Invalid players!");
+
+    // 2. Get Grid Size
+    const sizeInput = prompt(
+        "Choose Grid Size:\n1. Small (6x6)\n2. Medium (9x6 - Standard)\n3. Large (12x10)", 
+        "2"
+    );
+
+    switch(sizeInput) {
+        case "1": COLS = 6; ROWS = 6; break;
+        case "2": COLS = 6; ROWS = 9; break;
+        case "3": COLS = 10; ROWS = 12; break;
+        default: alert("Defaulting to Medium"); COLS = 6; ROWS = 9;
+    }
+
+    playerCount = pCount;
+    resetGame();
+}
+
+class Particle {
+    constructor(startX, startY, targetR, targetC, color, owner) {
+        this.x = startX; this.y = startY;
+        this.targetX = targetC * CELL_SIZE + CELL_SIZE / 2;
+        this.targetY = targetR * CELL_SIZE + CELL_SIZE / 2;
+        this.targetR = targetR; this.targetC = targetC;
+        this.color = color; this.owner = owner;
+        this.speed = 10; this.reached = false;
+    }
+    update() {
+        const dx = this.targetX - this.x;
+        const dy = this.targetY - this.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < this.speed) { this.x = this.targetX; this.y = this.targetY; this.reached = true; }
+        else { this.x += (dx / dist) * this.speed; this.y += (dy / dist) * this.speed; }
+    }
+    draw() {
+        ctx.shadowBlur = 15; ctx.shadowColor = this.color; ctx.fillStyle = this.color;
+        ctx.beginPath(); ctx.arc(this.x, this.y, CELL_SIZE/4, 0, Math.PI * 2);
+        ctx.fill(); ctx.shadowBlur = 0;
+    }
+}
+
+function getCriticalMass(r, c) {
+    let mass = 4;
+    if (r === 0 || r === ROWS - 1) mass--;
+    if (c === 0 || c === COLS - 1) mass--;
+    return mass;
+}
+
+async function handleExplosion(r, c, playerId) {
+    if (gameOver) return;
+    const cell = grid[r][c];
+    if (cell.atoms < getCriticalMass(r, c)) return;
+
+    cell.atoms = 0; cell.owner = -1;
+    const neighbors = [[r-1, c], [r+1, c], [r, c-1], [r, c+1]];
+    let activeMoves = [];
+
+    for (let [nr, nc] of neighbors) {
+        if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) {
+            const p = new Particle(c * CELL_SIZE + CELL_SIZE/2, r * CELL_SIZE + CELL_SIZE/2, nr, nc, colors[playerId], playerId);
+            particles.push(p); activeMoves.push(p);
+        }
+    }
+
+    await new Promise(res => {
+        const itv = setInterval(() => { if (activeMoves.every(p => p.reached)) { clearInterval(itv); res(); } }, 16);
+    });
+
+    for (let p of activeMoves) {
+        grid[p.targetR][p.targetC].owner = playerId;
+        grid[p.targetR][p.targetC].atoms++;
+        particles = particles.filter(item => item !== p);
+    }
+
+    // Win Check mid-reaction
+    if (hasMoved.every(m => m)) {
+        const activeOwners = new Set();
+        for (let row of grid) for (let col of row) if (col.owner !== -1) activeOwners.add(col.owner);
+        if (activeOwners.size === 1) {
+            const winner = [...activeOwners][0];
+            statusDiv.innerText = `PLAYER ${winner + 1} VICTORIOUS!`;
+            statusDiv.style.color = colors[winner];
+            gameOver = true; isAnimating = false; particles = [];
+            return;
+        }
+    }
+
+    for (let p of activeMoves) if (!gameOver) await handleExplosion(p.targetR, p.targetC, playerId);
+}
+
+function gameLoop() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = '#444';
+    for(let i=0; i<=COLS; i++) { ctx.beginPath(); ctx.moveTo(i*CELL_SIZE,0); ctx.lineTo(i*CELL_SIZE, canvas.height); ctx.stroke(); }
+    for(let i=0; i<=ROWS; i++) { ctx.beginPath(); ctx.moveTo(0, i*CELL_SIZE); ctx.lineTo(canvas.width, i*CELL_SIZE); ctx.stroke(); }
+
+    for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+            const cell = grid[r][c];
+            if (cell.atoms > 0) {
+                ctx.fillStyle = colors[cell.owner];
+                const cx = c * CELL_SIZE + CELL_SIZE / 2;
+                const cy = r * CELL_SIZE + CELL_SIZE / 2;
+                for(let i=0; i<cell.atoms; i++) {
+                    const angle = (Date.now() / 600) + (i * (Math.PI * 2 / cell.atoms));
+                    const dist = cell.atoms > 1 ? CELL_SIZE/5 : 0;
+                    ctx.beginPath();
+                    ctx.arc(cx + Math.cos(angle)*dist, cy + Math.sin(angle)*dist, CELL_SIZE/6, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.shadowBlur = 5; ctx.shadowColor = colors[cell.owner];
+                }
+                ctx.shadowBlur = 0;
+            }
+        }
+    }
+    particles.forEach(p => { p.update(); p.draw(); });
+    requestAnimationFrame(gameLoop);
+}
+
+canvas.addEventListener('click', async (e) => {
+    if (isAnimating || gameOver) return;
+    const rect = canvas.getBoundingClientRect();
+    const c = Math.floor((e.clientX - rect.left) / (rect.width / COLS));
+    const r = Math.floor((e.clientY - rect.top) / (rect.height / ROWS));
+    
+    if (grid[r][c].owner === -1 || grid[r][c].owner === currentPlayer) {
+        isAnimating = true;
+        grid[r][c].owner = currentPlayer;
+        grid[r][c].atoms++;
+        hasMoved[currentPlayer] = true;
+        await handleExplosion(r, c, currentPlayer);
+
+        if(!gameOver) {
+            do { currentPlayer = (currentPlayer + 1) % playerCount; } 
+            while (hasMoved[currentPlayer] && !grid.some(row => row.some(cell => cell.owner === currentPlayer)));
+            statusDiv.innerText = `PLAYER ${currentPlayer + 1}`;
+            statusDiv.style.color = colors[currentPlayer];
+            isAnimating = false;
+        }
+    }
+});
+
+resetGame();
+gameLoop();
+</script>
+</body>
+</html>
