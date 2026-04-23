@@ -3,265 +3,395 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Chain Reaction - Mobile Optimized</title>
+    <title>Chain Reaction Pro</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <style>
         :root {
-            --bg-color: #0a0a0a;
-            --panel-color: #1a1a1a;
+            --bg: #0d1117; --panel: #161b22; --text: #c9d1d9;
+            --border: #30363d; --accent: #238636;
+            --header-h: 3.75rem;
         }
+        [data-theme="light"] {
+            --bg: #ffffff; --panel: #f6f8fa; --text: #24292f;
+            --border: #d0d7de; --accent: #2da44e;
+        }
+
         body { 
-            background: var(--bg-color); 
-            color: white; 
-            font-family: 'Segoe UI', system-ui, sans-serif; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: space-between; 
-            /* Using dvh for dynamic viewport height */
-            height: 100dvh; 
-            margin: 0; 
-            overflow: hidden; 
-            padding: 10px 0;
-            box-sizing: border-box;
+            background: var(--bg); color: var(--text); 
+            font-family: -apple-system, system-ui, sans-serif; 
+            margin: 0; overflow: hidden; transition: background 0.2s;
+            font-size: 1rem;
         }
-        #status { 
-            font-size: clamp(20px, 5dvh, 28px); 
-            font-weight: bold; 
-            letter-spacing: 2px; 
-            height: 40px;
+
+        #app { height: 100dvh; width: 100vw; display: flex; flex-direction: column; }
+
+        header {
+            height: var(--header-h); background: var(--panel);
+            border-bottom: 0.0625rem solid var(--border);
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 1rem; z-index: 120;
         }
+
+        .turn-indicator {
+            display: flex; align-items: center; gap: 0.75rem;
+            font-weight: 800; letter-spacing: 0.0625rem; font-size: 0.9rem;
+        }
+
+        .player-dot {
+            width: 0.875rem; height: 0.875rem; border-radius: 50%;
+            transition: background 0.3s, box-shadow 0.3s;
+        }
+
+        .icon-btn {
+            background: var(--bg); border: 0.0625rem solid var(--border);
+            color: var(--text); width: 2.5rem; height: 2.5rem;
+            border-radius: 0.375rem; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .sidebar {
+            position: fixed; left: 0; top: var(--header-h); bottom: 0;
+            width: 16.25rem; background: var(--panel);
+            border-right: 0.0625rem solid var(--border);
+            padding: 1.25rem; box-sizing: border-box;
+            transform: translateX(-100%); transition: transform 0.3s ease;
+            z-index: 100;
+        }
+        .sidebar.open { transform: translateX(0); }
+
+        .game-area { flex: 1; display: flex; align-items: center; justify-content: center; padding: 1.25rem; }
+        
         canvas { 
-            border: 1px solid #444; 
-            background: #000; 
-            box-shadow: 0 0 20px rgba(0,0,0,1); 
-            cursor: pointer;
-            /* Ensure canvas doesn't exceed the available space between header and buttons */
-            max-height: 70dvh; 
-            max-width: 95vw;
-            touch-action: none; /* Prevents scrolling while playing */
+            border: 0.0625rem solid var(--border); 
+            border-radius: 0.25rem; 
+            touch-action: none; 
+            box-shadow: 0 0.625rem 1.875rem rgba(0,0,0,0.2);
         }
-        .controls { 
-            display: flex; 
-            gap: 10px; 
-            padding-bottom: 5px;
+
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+            display: flex; align-items: center; justify-content: center; z-index: 200;
+            backdrop-filter: blur(0.25rem);
         }
-        button { 
-            padding: 12px 20px; 
-            font-size: 14px; 
-            font-weight: bold;
-            cursor: pointer; 
-            background: var(--panel-color); 
-            color: white; 
-            border: 1px solid #444; 
-            border-radius: 8px; 
-            text-transform: uppercase;
+        .modal-card {
+            background: var(--panel); padding: 1.5rem; border-radius: 0.75rem;
+            border: 0.0625rem solid var(--border); width: 90%; max-width: 22rem;
         }
-        button:active { background: #333; transform: scale(0.95); }
+
+        .control-group { margin-bottom: 1rem; }
+        label { display: block; margin-bottom: 0.375rem; font-size: 0.75rem; opacity: 0.7; font-weight: 600; }
+        select, button {
+            width: 100%; padding: 0.75rem; background: var(--bg); color: var(--text);
+            border: 0.0625rem solid var(--border); border-radius: 0.375rem; cursor: pointer;
+            font-family: inherit; font-size: 0.875rem;
+        }
+        button.primary { background: var(--accent); color: white; border: none; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div id="status">PLAYER 1</div>
-    <canvas id="gameBoard"></canvas>
-    <div class="controls">
-        <button onclick="resetGame()">Reset</button>
-        <button onclick="newGame()">New Game</button>
+
+<div id="app">
+    <header>
+        <button class="icon-btn" @click="isSidebarOpen = !isSidebarOpen">
+            <span v-if="!isSidebarOpen">☰</span>
+            <span v-else>✕</span>
+        </button>
+
+        <div class="turn-indicator">
+            <div class="player-dot" :style="{ background: currentHex, boxShadow: `0 0 0.625rem ${currentHex}` }"></div>
+            <span>PLAYER {{ currentPlayer + 1 }}</span>
+        </div>
+
+        <div style="width: 2.5rem;"></div>
+    </header>
+
+    <aside class="sidebar" :class="{ open: isSidebarOpen }">
+        <div class="control-group">
+            <label>THEME MODE</label>
+            <select v-model="themeSetting">
+                <option value="system">System Default</option>
+                <option value="dark">Dark Mode</option>
+                <option value="light">Light Mode</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label>SESSION</label>
+            <button @click="handleNewGameRequest">🔄 New Game Settings</button>
+            <button @click="quickReset" style="margin-top:0.5rem">🧹 Quick Reset</button>
+        </div>
+    </aside>
+
+    <main class="game-area">
+        <canvas ref="board" :style="{ backgroundColor: themeColors.canvasBg }" @pointerdown="handleTap"></canvas>
+    </main>
+
+    <div v-if="showModal" class="modal-overlay">
+        <div class="modal-card">
+            <div v-if="gameOver" style="text-align: center; margin-bottom: 1.25rem;">
+                <p style="margin:0; opacity:0.7; font-size: 0.8rem;">VICTORY</p>
+                <h1 :style="{color: currentHex, margin: '0.3rem 0', fontSize: '2rem'}">PLAYER {{ currentPlayer + 1 }}</h1>
+            </div>
+            <h2 v-else style="margin-top:0; font-size: 1.25rem;">Match Settings</h2>
+
+            <div class="control-group">
+                <label>PLAYER COUNT</label>
+                <select v-model.number="tempPlayers">
+                    <option v-for="n in 5" :key="n" :value="n+1">{{ n+1 }} Players</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>GRID DENSITY</label>
+                <select v-model="tempSize">
+                    <option value="small">Small (6x6)</option>
+                    <option value="medium">Medium (9x6)</option>
+                    <option value="large">Large (12x10)</option>
+                </select>
+            </div>
+            <button class="primary" @click="confirmNewGame">
+                {{ gameOver ? 'PLAY AGAIN' : 'START MATCH' }}
+            </button>
+        </div>
     </div>
+</div>
 
 <script>
-const canvas = document.getElementById('gameBoard');
-const ctx = canvas.getContext('2d');
-const statusDiv = document.getElementById('status');
+/**
+ * @typedef {Object} ThemeColors
+ * @property {string} canvasBg
+ * @property {string} gridLine
+ */
 
-let ROWS = 9;
-let COLS = 6;
-let CELL_SIZE = 0;
-const colors = ['#00f2ff', '#ff007b', '#00ff44', '#ffff00', '#ff8800', '#cc00ff'];
-let currentPlayer = 0;
-let playerCount = 2;
-let grid = [];
-let particles = [];
-let isAnimating = false;
-let hasMoved = [];
-let gameOver = false;
-
-function resizeCanvas() {
-    // Dynamically calculate canvas width based on device width
-    const availableWidth = window.innerWidth * 0.95;
-    const availableHeight = window.innerHeight * 0.7; // 70dvh approximation
-    
-    // Calculate cell size based on which dimension is more restrictive
-    const cellW = availableWidth / COLS;
-    const cellH = availableHeight / ROWS;
-    CELL_SIZE = Math.min(cellW, cellH, 60); // Cap size for tablet/desktop
-    
-    canvas.width = COLS * CELL_SIZE;
-    canvas.height = ROWS * CELL_SIZE;
-}
-
-function initGrid() {
-    resizeCanvas();
-    grid = [];
-    for (let r = 0; r < ROWS; r++) {
-        grid[r] = [];
-        for (let c = 0; c < COLS; c++) {
-            grid[r][c] = { owner: -1, atoms: 0 };
-        }
-    }
-}
-
-function resetGame() {
-    initGrid();
-    currentPlayer = 0;
-    hasMoved = new Array(playerCount).fill(false);
-    isAnimating = false;
-    gameOver = false;
-    particles = [];
-    statusDiv.innerText = "PLAYER 1";
-    statusDiv.style.color = colors[0];
-}
-
-function newGame() {
-    const pCount = parseInt(prompt("Players (2-6):", "2"));
-    if (isNaN(pCount) || pCount < 2 || pCount > 6) return;
-
-    const sizeInput = prompt("Size:\n1. Small (6x6)\n2. Medium (9x6)\n3. Large (12x10)", "2");
-    switch(sizeInput) {
-        case "1": COLS = 6; ROWS = 6; break;
-        case "2": COLS = 6; ROWS = 9; break;
-        case "3": COLS = 10; ROWS = 12; break;
-    }
-    playerCount = pCount;
-    resetGame();
-}
-
-class Particle {
-    constructor(startX, startY, targetR, targetC, color, owner) {
-        this.x = startX; this.y = startY;
-        this.targetX = targetC * CELL_SIZE + CELL_SIZE / 2;
-        this.targetY = targetR * CELL_SIZE + CELL_SIZE / 2;
-        this.targetR = targetR; this.targetC = targetC;
-        this.color = color; this.owner = owner;
-        this.speed = CELL_SIZE / 6; 
-        this.reached = false;
-    }
-    update() {
-        const dx = this.targetX - this.x;
-        const dy = this.targetY - this.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < this.speed) { this.x = this.targetX; this.y = this.targetY; this.reached = true; }
-        else { this.x += (dx / dist) * this.speed; this.y += (dy / dist) * this.speed; }
-    }
-    draw() {
-        ctx.shadowBlur = 10; ctx.shadowColor = this.color; ctx.fillStyle = this.color;
-        ctx.beginPath(); ctx.arc(this.x, this.y, CELL_SIZE/4, 0, Math.PI * 2);
-        ctx.fill(); ctx.shadowBlur = 0;
-    }
-}
-
-function getCriticalMass(r, c) {
-    let mass = 4;
-    if (r === 0 || r === ROWS - 1) mass--;
-    if (c === 0 || c === COLS - 1) mass--;
-    return mass;
-}
-
-async function handleExplosion(r, c, playerId) {
-    if (gameOver) return;
-    const cell = grid[r][c];
-    if (cell.atoms < getCriticalMass(r, c)) return;
-
-    cell.atoms = 0; cell.owner = -1;
-    const neighbors = [[r-1, c], [r+1, c], [r, c-1], [r, c+1]];
-    let activeMoves = [];
-
-    for (let [nr, nc] of neighbors) {
-        if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) {
-            const p = new Particle(c * CELL_SIZE + CELL_SIZE/2, r * CELL_SIZE + CELL_SIZE/2, nr, nc, colors[playerId], playerId);
-            particles.push(p); activeMoves.push(p);
-        }
-    }
-
-    await new Promise(res => {
-        const itv = setInterval(() => { if (activeMoves.every(p => p.reached)) { clearInterval(itv); res(); } }, 16);
-    });
-
-    for (let p of activeMoves) {
-        grid[p.targetR][p.targetC].owner = playerId;
-        grid[p.targetR][p.targetC].atoms++;
-        particles = particles.filter(item => item !== p);
-    }
-
-    // Immediate Win Check
-    if (hasMoved.every(m => m)) {
-        const owners = new Set();
-        for (let row of grid) for (let col of row) if (col.owner !== -1) owners.add(col.owner);
-        if (owners.size === 1) {
-            const winner = [...owners][0];
-            statusDiv.innerText = `WINNER: P${winner + 1}`;
-            statusDiv.style.color = colors[winner];
-            gameOver = true; isAnimating = false; particles = [];
-            return;
-        }
-    }
-
-    for (let p of activeMoves) if (!gameOver) await handleExplosion(p.targetR, p.targetC, playerId);
-}
-
-function gameLoop() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.strokeStyle = '#333';
-    for(let i=0; i<=COLS; i++) { ctx.beginPath(); ctx.moveTo(i*CELL_SIZE,0); ctx.lineTo(i*CELL_SIZE, canvas.height); ctx.stroke(); }
-    for(let i=0; i<=ROWS; i++) { ctx.beginPath(); ctx.moveTo(0, i*CELL_SIZE); ctx.lineTo(canvas.width, i*CELL_SIZE); ctx.stroke(); }
-
-    for (let r = 0; r < ROWS; r++) {
-        for (let c = 0; c < COLS; c++) {
-            const cell = grid[r][c];
-            if (cell.atoms > 0) {
-                ctx.fillStyle = colors[cell.owner];
-                const cx = c * CELL_SIZE + CELL_SIZE / 2;
-                const cy = r * CELL_SIZE + CELL_SIZE / 2;
-                for(let i=0; i<cell.atoms; i++) {
-                    const angle = (Date.now() / 600) + (i * (Math.PI * 2 / cell.atoms));
-                    const dist = cell.atoms > 1 ? CELL_SIZE/5 : 0;
-                    ctx.beginPath();
-                    ctx.arc(cx + Math.cos(angle)*dist, cy + Math.sin(angle)*dist, CELL_SIZE/5, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-            }
-        }
-    }
-    particles.forEach(p => { p.update(); p.draw(); });
-    requestAnimationFrame(gameLoop);
-}
-
-canvas.addEventListener('pointerdown', async (e) => { // Using pointerdown for better mobile response
-    if (isAnimating || gameOver) return;
-    const rect = canvas.getBoundingClientRect();
-    const c = Math.floor((e.clientX - rect.left) / (rect.width / COLS));
-    const r = Math.floor((e.clientY - rect.top) / (rect.height / ROWS));
-    
-    if (r >= 0 && r < ROWS && c >= 0 && c < COLS && (grid[r][c].owner === -1 || grid[r][c].owner === currentPlayer)) {
-        isAnimating = true;
-        grid[r][c].owner = currentPlayer;
-        grid[r][c].atoms++;
-        hasMoved[currentPlayer] = true;
-        await handleExplosion(r, c, currentPlayer);
-
-        if(!gameOver) {
-            do { currentPlayer = (currentPlayer + 1) % playerCount; } 
-            while (hasMoved[currentPlayer] && !grid.some(row => row.some(cell => cell.owner === currentPlayer)));
-            statusDiv.innerText = `PLAYER ${currentPlayer + 1}`;
-            statusDiv.style.color = colors[currentPlayer];
-            isAnimating = false;
-        }
-    }
+/** @type {Object<string, ThemeColors>} */
+const THEME_MAP = Object.freeze({
+    dark: { canvasBg: '#000000', gridLine: '#444c56' },
+    light: { canvasBg: '#ffffff', gridLine: '#8c959f' }
 });
 
-// Handle orientation changes
-window.addEventListener('resize', initGrid);
+const { createApp, ref, reactive, onMounted, computed, watch } = Vue;
 
-resetGame();
-gameLoop();
+createApp({
+    setup() {
+        // --- UI State ---
+        const board = ref(null);
+        const themeSetting = ref('system');
+        const isSidebarOpen = ref(false);
+        const showModal = ref(true);
+        const isAnimating = ref(false);
+
+        // --- Game Logic State ---
+        const gameOver = ref(false);
+        const currentPlayer = ref(0);
+        const playerCount = ref(2);
+        const rows = ref(9), cols = ref(6), cellSize = ref(0);
+        const tempPlayers = ref(2), tempSize = ref('medium');
+        
+        const colors = ['#00f2ff', '#ff007b', '#00ff44', '#ffff00', '#ff8800', '#cc00ff'];
+        const grid = reactive([]);
+        const particles = reactive([]);
+        const hasMoved = reactive([]);
+
+        // --- Computed Properties ---
+        const currentHex = computed(() => colors[currentPlayer.value]);
+
+        const activeThemeName = computed(() => {
+            if (themeSetting.value !== 'system') return themeSetting.value;
+            return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        });
+
+        const themeColors = computed(() => THEME_MAP[activeThemeName.value]);
+
+        // --- Surgical Watchers ---
+        watch(activeThemeName, (newTheme) => {
+            document.body.setAttribute('data-theme', newTheme);
+        }, { immediate: true });
+
+        // --- Internal Utilities ---
+        const getCriticalMass = (r, c) => {
+            let mass = 4;
+            if (r === 0 || r === rows.value - 1) mass--;
+            if (c === 0 || c === cols.value - 1) mass--;
+            return mass;
+        };
+
+        const isGameInProgress = () => hasMoved.some(m => m) && !gameOver.value;
+
+        // --- Core Lifecycle Logic ---
+        const initGrid = () => {
+            const canvas = board.value;
+            if (!canvas) return;
+            const availableW = window.innerWidth * 0.9;
+            const availableH = (window.innerHeight - 80) * 0.85;
+            cellSize.value = Math.min(availableW / cols.value, availableH / rows.value, 60);
+            canvas.width = cols.value * cellSize.value;
+            canvas.height = rows.value * cellSize.value;
+
+            grid.length = 0;
+            for (let r = 0; r < rows.value; r++) {
+                grid[r] = [];
+                for (let c = 0; c < cols.value; c++) grid[r][c] = { owner: -1, atoms: 0 };
+            }
+        };
+
+        const resetGame = () => {
+            initGrid();
+            currentPlayer.value = 0;
+            hasMoved.length = 0;
+            hasMoved.push(...new Array(playerCount.value).fill(false));
+            gameOver.value = false;
+            isAnimating.value = false;
+            particles.length = 0;
+        };
+
+        // --- Event Handlers ---
+        const handleNewGameRequest = () => {
+            if (isGameInProgress() && !confirm("Abandon current match and change settings?")) return;
+            showModal.value = true;
+            isSidebarOpen.value = false;
+        };
+
+        const quickReset = () => {
+            if (isGameInProgress() && !confirm("Reset the current board?")) return;
+            isSidebarOpen.value = false;
+            resetGame();
+        };
+
+        const confirmNewGame = () => {
+            playerCount.value = tempPlayers.value;
+            const sizeMap = { small: [6, 6], medium: [9, 6], large: [12, 10] };
+            [rows.value, cols.value] = sizeMap[tempSize.value];
+            showModal.value = false;
+            resetGame();
+        };
+
+        const handleExplosion = async (r, c, playerId) => {
+            if (gameOver.value) return;
+            const cell = grid[r][c];
+            if (cell.atoms < getCriticalMass(r, c)) return;
+
+            cell.atoms = 0; cell.owner = -1;
+
+            const neighbors = [[r-1, c], [r+1, c], [r, c-1], [r, c+1]];
+            const activeMoves = neighbors
+                .filter(([nr, nc]) => nr >= 0 && nr < rows.value && nc >= 0 && nc < cols.value)
+                .map(([nr, nc]) => ({
+                    x: c * cellSize.value + cellSize.value/2,
+                    y: r * cellSize.value + cellSize.value/2,
+                    targetR: nr, targetC: nc, reached: false
+                }));
+
+            particles.push(...activeMoves);
+
+            await new Promise(res => {
+                const check = setInterval(() => {
+                    activeMoves.forEach(p => {
+                        const tx = p.targetC * cellSize.value + cellSize.value/2;
+                        const ty = p.targetR * cellSize.value + cellSize.value/2;
+                        p.x += (tx - p.x) * 0.35; p.y += (ty - p.y) * 0.35;
+                        if (Math.hypot(tx - p.x, ty - p.y) < 2) { p.x = tx; p.y = ty; p.reached = true; }
+                    });
+                    if (activeMoves.every(p => p.reached)) { clearInterval(check); res(); }
+                }, 16);
+            });
+
+            for (let p of activeMoves) {
+                const target = grid[p.targetR][p.targetC];
+                target.owner = playerId;
+                target.atoms++;
+                const idx = particles.indexOf(p);
+                if (idx > -1) particles.splice(idx, 1);
+            }
+
+            // Winner Detection
+            const owners = new Set();
+            grid.forEach(row => row.forEach(col => { if(col.owner !== -1) owners.add(col.owner) }));
+            if (hasMoved.every(m => m) && owners.size === 1) {
+                gameOver.value = true;
+                isAnimating.value = false;
+                particles.length = 0;
+                showModal.value = true;
+                return;
+            }
+
+            for (let p of activeMoves) if (!gameOver.value) await handleExplosion(p.targetR, p.targetC, playerId);
+        };
+
+        const handleTap = async (e) => {
+            if (isAnimating.value || gameOver.value || showModal.value) return;
+            const rect = board.value.getBoundingClientRect();
+            const c = Math.floor((e.clientX - rect.left) / cellSize.value);
+            const r = Math.floor((e.clientY - rect.top) / cellSize.value);
+
+            if (r >= 0 && r < rows.value && c >= 0 && c < cols.value) {
+                const cell = grid[r][c];
+                if (cell.owner === -1 || cell.owner === currentPlayer.value) {
+                    isAnimating.value = true;
+                    cell.owner = currentPlayer.value;
+                    cell.atoms++;
+                    hasMoved[currentPlayer.value] = true;
+                    await handleExplosion(r, c, currentPlayer.value);
+                    
+                    if (!gameOver.value) {
+                        do { currentPlayer.value = (currentPlayer.value + 1) % playerCount.value; } 
+                        while (hasMoved[currentPlayer.value] && !grid.some(row => row.some(c => c.owner === currentPlayer.value)));
+                        isAnimating.value = false;
+                    }
+                }
+            }
+        };
+
+        const draw = () => {
+            const canvas = board.value;
+            const ctx = canvas?.getContext('2d');
+            if (!ctx) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Grid rendering
+            ctx.strokeStyle = themeColors.value.gridLine;
+            ctx.lineWidth = 1;
+            for(let i=0; i<=cols.value; i++) { 
+                ctx.beginPath(); ctx.moveTo(i * cellSize.value, 0); ctx.lineTo(i * cellSize.value, canvas.height); ctx.stroke(); 
+            }
+            for(let i=0; i<=rows.value; i++) { 
+                ctx.beginPath(); ctx.moveTo(0, i * cellSize.value); ctx.lineTo(canvas.width, i * cellSize.value); ctx.stroke(); 
+            }
+
+            // Atoms rendering
+            grid.forEach((row, r) => row.forEach((cell, c) => {
+                if (cell.atoms > 0) {
+                    ctx.fillStyle = colors[cell.owner];
+                    const cx = c * cellSize.value + cellSize.value/2, cy = r * cellSize.value + cellSize.value/2;
+                    for(let i=0; i<cell.atoms; i++) {
+                        const angle = (Date.now() / 600) + (i * (Math.PI * 2 / cell.atoms));
+                        const d = cell.atoms > 1 ? cellSize.value/5 : 0;
+                        ctx.beginPath(); ctx.arc(cx + Math.cos(angle)*d, cy + Math.sin(angle)*d, cellSize.value/5.5, 0, Math.PI * 2); ctx.fill();
+                    }
+                }
+            }));
+
+            // Animation particles
+            particles.forEach(p => {
+                ctx.fillStyle = currentHex.value;
+                ctx.beginPath(); ctx.arc(p.x, p.y, cellSize.value/4.5, 0, Math.PI * 2); ctx.fill();
+            });
+
+            requestAnimationFrame(draw);
+        };
+
+        onMounted(() => {
+            window.addEventListener('resize', initGrid);
+            initGrid();
+            draw();
+        });
+
+        return { 
+            board, themeSetting, activeThemeName, themeColors, isSidebarOpen, showModal, 
+            gameOver, currentPlayer, currentHex, tempPlayers, tempSize, 
+            handleNewGameRequest, confirmNewGame, quickReset, handleTap 
+        };
+    }
+}).mount('#app');
 </script>
 </body>
 </html>
