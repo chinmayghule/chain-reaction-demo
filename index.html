@@ -3,393 +3,411 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Chain Reaction Pro</title>
+    <title>Chain Reaction: Aegis System</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <style>
         :root {
-            --bg: #0d1117; --panel: #161b22; --text: #c9d1d9;
-            --border: #30363d; --accent: #238636;
-            --header-h: 3.75rem;
+            --bg: #0d1117; --panel: #161b22; --surface: #21262d; --text: #c9d1d9;
+            --border: #30363d; --accent: #238636; --ping-color: #58a6ff; --shadow: rgba(0, 0, 0, 0.4);
         }
         [data-theme="light"] {
-            --bg: #ffffff; --panel: #f6f8fa; --text: #24292f;
-            --border: #d0d7de; --accent: #2da44e;
+            --bg: #ffffff; --panel: #f6f8fa; --surface: #ffffff; --text: #24292f;
+            --border: #d0d7de; --accent: #2da44e; --ping-color: #0969da; --shadow: rgba(0, 0, 0, 0.1);
         }
-
-        body { 
-            background: var(--bg); color: var(--text); 
-            font-family: -apple-system, system-ui, sans-serif; 
-            margin: 0; overflow: hidden; transition: background 0.2s;
-            font-size: 1rem;
-        }
-
-        #app { height: 100dvh; width: 100vw; display: flex; flex-direction: column; }
-
-        header {
-            height: var(--header-h); background: var(--panel);
-            border-bottom: 0.0625rem solid var(--border);
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 0 1rem; z-index: 120;
-        }
-
-        .turn-indicator {
-            display: flex; align-items: center; gap: 0.75rem;
-            font-weight: 800; letter-spacing: 0.0625rem; font-size: 0.9rem;
-        }
-
-        .player-dot {
-            width: 0.875rem; height: 0.875rem; border-radius: 50%;
-            transition: background 0.3s, box-shadow 0.3s;
-        }
-
-        .icon-btn {
-            background: var(--bg); border: 0.0625rem solid var(--border);
-            color: var(--text); width: 2.5rem; height: 2.5rem;
-            border-radius: 0.375rem; cursor: pointer;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 1.2rem;
-        }
-
-        .sidebar {
-            position: fixed; left: 0; top: var(--header-h); bottom: 0;
-            width: 16.25rem; background: var(--panel);
-            border-right: 0.0625rem solid var(--border);
-            padding: 1.25rem; box-sizing: border-box;
-            transform: translateX(-100%); transition: transform 0.3s ease;
-            z-index: 100;
-        }
-        .sidebar.open { transform: translateX(0); }
-
-        .game-area { flex: 1; display: flex; align-items: center; justify-content: center; padding: 1.25rem; }
-        
-        canvas { 
-            border: 0.0625rem solid var(--border); 
-            border-radius: 0.25rem; 
-            touch-action: none; 
-            box-shadow: 0 0.625rem 1.875rem rgba(0,0,0,0.2);
-        }
-
-        .modal-overlay {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.85);
-            display: flex; align-items: center; justify-content: center; z-index: 200;
-            backdrop-filter: blur(0.25rem);
-        }
-        .modal-card {
-            background: var(--panel); padding: 1.5rem; border-radius: 0.75rem;
-            border: 0.0625rem solid var(--border); width: 90%; max-width: 22rem;
-        }
-
-        .control-group { margin-bottom: 1rem; }
-        label { display: block; margin-bottom: 0.375rem; font-size: 0.75rem; opacity: 0.7; font-weight: 600; }
-        select, button {
-            width: 100%; padding: 0.75rem; background: var(--bg); color: var(--text);
-            border: 0.0625rem solid var(--border); border-radius: 0.375rem; cursor: pointer;
-            font-family: inherit; font-size: 0.875rem;
-        }
-        button.primary { background: var(--accent); color: white; border: none; font-weight: bold; }
+        body { background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, sans-serif; margin: 0; overflow: hidden; transition: background 0.3s, color 0.3s; }
+        #app { height: 100dvh; display: flex; flex-direction: column; }
+        header { background: var(--panel); border-bottom: 1px solid var(--border); height: 3.5rem; display: flex; align-items: center; justify-content: space-between; padding: 0 1rem; z-index: 100; }
+        .dashboard { position: fixed; inset: 0; background: var(--bg); z-index: 1000; padding: 2rem; overflow-y: auto; }
+        .control-card { background: var(--panel); border: 1px solid var(--border); padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem; box-shadow: 0 4px 6px var(--shadow); }
+        label { display: block; font-size: 0.7rem; font-weight: 800; margin-bottom: 0.5rem; opacity: 0.8; text-transform: uppercase; }
+        select { width: 100%; padding: 0.8rem; border-radius: 8px; background: var(--surface); color: var(--text); border: 1px solid var(--border); font-size: 1rem; margin-bottom: 1rem; outline: none; }
+        button { padding: 0.8rem 1.2rem; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-weight: 600; cursor: pointer; transition: 0.2s; }
+        button.active-toggle { background: var(--accent); color: white; border-color: transparent; }
+        button.primary { background: var(--accent); color: white; border: none; font-size: 1.1rem; width: 100%; margin-top: 1rem; }
+        .theme-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-bottom: 1rem; }
+        .game-area { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; }
+        canvas { touch-action: none; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); }
+        .cpu-ping { position: absolute; border: 3px solid var(--ping-color); border-radius: 8px; pointer-events: none; z-index: 50; animation: ping 0.5s infinite alternate; box-sizing: border-box; }
+        @keyframes ping { from { opacity: 0.4; transform: scale(0.95); } to { opacity: 1; transform: scale(1.05); } }
     </style>
 </head>
 <body>
 
 <div id="app">
     <header>
-        <button class="icon-btn" @click="isSidebarOpen = !isSidebarOpen">
-            <span v-if="!isSidebarOpen">☰</span>
-            <span v-else>✕</span>
-        </button>
-
-        <div class="turn-indicator">
-            <div class="player-dot" :style="{ background: currentHex, boxShadow: `0 0 0.625rem ${currentHex}` }"></div>
-            <span>PLAYER {{ currentPlayer + 1 }}</span>
+        <button @click="showMenu = true">⚙️ SETTINGS</button>
+        <div v-if="gameActive" :style="{color: players[turn]?.color, fontWeight: '900'}">
+            {{ isThinking ? 'AEGIS EVALUATING...' : players[turn]?.name }}
         </div>
-
-        <div style="width: 2.5rem;"></div>
+        <div style="width: 80px"></div>
     </header>
 
-    <aside class="sidebar" :class="{ open: isSidebarOpen }">
-        <div class="control-group">
-            <label>THEME MODE</label>
-            <select v-model="themeSetting">
-                <option value="system">System Default</option>
-                <option value="dark">Dark Mode</option>
-                <option value="light">Light Mode</option>
-            </select>
-        </div>
-
-        <div class="control-group">
-            <label>SESSION</label>
-            <button @click="handleNewGameRequest">🔄 New Game Settings</button>
-            <button @click="quickReset" style="margin-top:0.5rem">🧹 Quick Reset</button>
-        </div>
-    </aside>
-
     <main class="game-area">
-        <canvas ref="board" :style="{ backgroundColor: themeColors.canvasBg }" @pointerdown="handleTap"></canvas>
+        <div v-if="cpuTarget" class="cpu-ping" :style="cpuTargetStyle"></div>
+        <canvas ref="board" @pointerdown="handleInput"></canvas>
     </main>
 
-    <div v-if="showModal" class="modal-overlay">
-        <div class="modal-card">
-            <div v-if="gameOver" style="text-align: center; margin-bottom: 1.25rem;">
-                <p style="margin:0; opacity:0.7; font-size: 0.8rem;">VICTORY</p>
-                <h1 :style="{color: currentHex, margin: '0.3rem 0', fontSize: '2rem'}">PLAYER {{ currentPlayer + 1 }}</h1>
+    <div v-if="showMenu" class="dashboard">
+        <div class="control-card">
+            <label>Visual Theme</label>
+            <div class="theme-grid">
+                <button v-for="t in ['system', 'light', 'dark']" :key="t" @click="setTheme(t)" :class="{'active-toggle': settings.theme === t}">{{ t.toUpperCase() }}</button>
             </div>
-            <h2 v-else style="margin-top:0; font-size: 1.25rem;">Match Settings</h2>
-
-            <div class="control-group">
-                <label>PLAYER COUNT</label>
-                <select v-model.number="tempPlayers">
-                    <option v-for="n in 5" :key="n" :value="n+1">{{ n+1 }} Players</option>
-                </select>
-            </div>
-            <div class="control-group">
-                <label>GRID DENSITY</label>
-                <select v-model="tempSize">
-                    <option value="small">Small (6x6)</option>
-                    <option value="medium">Medium (9x6)</option>
-                    <option value="large">Large (12x10)</option>
-                </select>
-            </div>
-            <button class="primary" @click="confirmNewGame">
-                {{ gameOver ? 'PLAY AGAIN' : 'START MATCH' }}
-            </button>
         </div>
+        
+        <div class="control-card">
+            <label>Game Mode</label>
+            <select v-model="settings.mode">
+                <option value="pvp">Local Multiplayer</option>
+                <option value="cpu">VS Aegis AI (1v1)</option>
+            </select>
+            
+            <div v-if="settings.mode === 'cpu'">
+                <label>Difficulty Level</label>
+                <select v-model.number="settings.difficulty">
+                    <option :value="2">Easy</option>
+                    <option :value="3">Medium</option>
+                    <option :value="4">Hard</option>
+                    <option :value="6">Brutal</option>
+                    <option :value="8">Hell (Relative Density)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="control-card">
+            <label>Grid Size</label>
+            <select v-model="settings.size"><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select>
+        </div>
+        <button class="primary" @click="initGame">START NEW GAME</button>
     </div>
 </div>
 
+<script id="worker-script" type="application/javascript">
+    const hashValues = new Uint32Array(15 * 15 * 10);
+    for (let i = 0; i < hashValues.length; i++) hashValues[i] = Math.floor(Math.random() * 0xFFFFFFFF);
+    const transTable = new Map();
+
+    self.onmessage = function(e) {
+        const { grid, playerId, rows, cols, difficulty } = e.data;
+        const opponentId = (playerId + 1) % 2;
+        const startTime = Date.now();
+        const TIME_LIMIT = 3500;
+        transTable.clear();
+
+        const boardSize = rows * cols;
+        const mainBoard = new Int8Array(boardSize * 2);
+        let initialHash = 0;
+
+        const updateHash = (h, i, oldOwner, oldAtoms, newOwner, newAtoms) => {
+            if (oldOwner !== -1) h ^= hashValues[i * 10 + (oldOwner * 4 + oldAtoms)];
+            if (newOwner !== -1) h ^= hashValues[i * 10 + (newOwner * 4 + newAtoms)];
+            return h;
+        };
+
+        const getLimit = (r, c) => {
+            let m = 4; if (r === 0 || r === rows - 1) m--; if (c === 0 || c === cols - 1) m--; return m;
+        };
+
+        for(let r=0; r<rows; r++) {
+            for(let c=0; c<cols; c++) {
+                const i = r * cols + c;
+                mainBoard[i*2] = grid[r][c].owner;
+                mainBoard[i*2+1] = grid[r][c].atoms;
+                if (grid[r][c].owner !== -1) initialHash = updateHash(initialHash, i, -1, 0, grid[r][c].owner, grid[r][c].atoms);
+            }
+        }
+
+        const simulate = (board, r, c, pid, h) => {
+            const next = new Int8Array(board);
+            const queue = [r, c];
+            let newHash = h;
+            while (queue.length > 0) {
+                const curC = queue.pop(), curR = queue.pop(), i = curR * cols + curC, idx = i * 2;
+                const oldOwner = next[idx], oldAtoms = next[idx+1];
+                next[idx] = pid; next[idx+1]++;
+                newHash = updateHash(newHash, i, oldOwner, oldAtoms, next[idx], next[idx+1]);
+                const limit = getLimit(curR, curC);
+                if (next[idx+1] >= limit) {
+                    newHash = updateHash(newHash, i, next[idx], next[idx+1], -1, 0);
+                    next[idx+1] = 0; next[idx] = -1;
+                    if (curR > 0) queue.push(curR - 1, curC);
+                    if (curR < rows - 1) queue.push(curR + 1, curC);
+                    if (curC > 0) queue.push(curR, curC - 1);
+                    if (curC < cols - 1) queue.push(curR, curC + 1);
+                }
+            }
+            return { board: next, hash: newHash };
+        };
+
+        const evaluate = (board, pid) => {
+            let score = 0, pAtoms = 0, oAtoms = 0;
+            const oppId = 1 - pid;
+
+            for (let i = 0; i < boardSize; i++) {
+                const owner = board[i*2], atoms = board[i*2+1];
+                if (owner === -1) continue;
+                
+                const r = Math.floor(i/cols), c = i%cols;
+                const limit = getLimit(r, c);
+                
+                // Pure Rule Logic: Value = Proximity to explosion (Density)
+                // A corner (limit 2) with 1 atom is 0.5. A center (limit 4) with 1 is 0.25.
+                let val = (atoms / limit) * 10; 
+
+                // Vulnerability/Trap Guard (Survival Math)
+                let isVulnerable = false;
+                const neighbors = [[r-1,c],[r+1,c],[r,c-1],[r,c+1]];
+                for(const [nr, nc] of neighbors) {
+                    if (nr>=0 && nr<rows && nc>=0 && nc<cols) {
+                        const nIdx = (nr * cols + nc) * 2;
+                        if (board[nIdx] === (1 - owner) && board[nIdx+1] === getLimit(nr, nc) - 1) {
+                            isVulnerable = true; break;
+                        }
+                    }
+                }
+
+                if (isVulnerable) val -= 20; 
+                else if (atoms === limit - 1) val += 8;
+
+                if (owner === pid) { pAtoms += atoms; score += val; }
+                else { oAtoms += atoms; score -= val; }
+            }
+
+            if (oAtoms === 0 && pAtoms > 0) return 1000000;
+            if (pAtoms === 0 && oAtoms > 0) return -1000000;
+            return score;
+        };
+
+        const minimax = (board, depth, isMax, alpha, beta, h) => {
+            if (Date.now() - startTime > TIME_LIMIT) return evaluate(board, playerId);
+            if (transTable.has(h)) {
+                const entry = transTable.get(h);
+                if (entry.depth >= depth) return entry.score;
+            }
+            if (depth === 0) return evaluate(board, playerId);
+            
+            const curPid = isMax ? playerId : opponentId;
+            let best = isMax ? -Infinity : Infinity;
+            const moves = [];
+            for (let i = 0; i < boardSize; i++) {
+                if (board[i*2] === -1 || board[i*2] === curPid) {
+                    const r = Math.floor(i/cols), c = i%cols;
+                    moves.push({r, c, p: (board[i*2+1] / getLimit(r, c))});
+                }
+            }
+            moves.sort((a, b) => b.p - a.p);
+
+            for (const m of moves) {
+                const nextState = simulate(board, m.r, m.c, curPid, h);
+                const score = minimax(nextState.board, depth - 1, !isMax, alpha, beta, nextState.hash);
+                if (isMax) { best = Math.max(best, score); alpha = Math.max(alpha, best); }
+                else { best = Math.min(best, score); beta = Math.min(beta, best); }
+                if (beta <= alpha) break;
+            }
+            transTable.set(h, {score: best, depth: depth});
+            return best;
+        };
+
+        let finalMove = null;
+        const availableMoves = [];
+        for (let i = 0; i < boardSize; i++) 
+            if (mainBoard[i*2] === -1 || mainBoard[i*2] === playerId) availableMoves.push({r: Math.floor(i/cols), c: i%cols});
+
+        for (let d = 1; d <= difficulty; d++) {
+            if (Date.now() - startTime > TIME_LIMIT) break;
+            let bestScore = -Infinity, moveAtDepth = null;
+            for (const m of availableMoves) {
+                if (Date.now() - startTime > TIME_LIMIT) break;
+                const nextState = simulate(mainBoard, m.r, m.c, playerId, initialHash);
+                const score = minimax(nextState.board, d - 1, false, -Infinity, Infinity, nextState.hash);
+                if (score > bestScore) { bestScore = score; moveAtDepth = m; }
+            }
+            if (moveAtDepth) {
+                finalMove = moveAtDepth;
+                self.postMessage({ type: 'INTERIM', move: finalMove });
+            }
+        }
+        self.postMessage({ type: 'FINAL', move: finalMove || availableMoves[0] });
+    };
+</script>
+
 <script>
-/**
- * @typedef {Object} ThemeColors
- * @property {string} canvasBg
- * @property {string} gridLine
- */
-
-/** @type {Object<string, ThemeColors>} */
-const THEME_MAP = Object.freeze({
-    dark: { canvasBg: '#000000', gridLine: '#444c56' },
-    light: { canvasBg: '#ffffff', gridLine: '#8c959f' }
-});
-
 const { createApp, ref, reactive, onMounted, computed, watch } = Vue;
 
 createApp({
     setup() {
-        // --- UI State ---
         const board = ref(null);
-        const themeSetting = ref('system');
-        const isSidebarOpen = ref(false);
-        const showModal = ref(true);
-        const isAnimating = ref(false);
+        const showMenu = ref(true);
+        const gameActive = ref(false);
+        const isThinking = ref(false);
+        const cpuTarget = ref(null);
+        const animations = ref([]);
 
-        // --- Game Logic State ---
-        const gameOver = ref(false);
-        const currentPlayer = ref(0);
-        const playerCount = ref(2);
-        const rows = ref(9), cols = ref(6), cellSize = ref(0);
-        const tempPlayers = ref(2), tempSize = ref('medium');
-        
-        const colors = ['#00f2ff', '#ff007b', '#00ff44', '#ffff00', '#ff8800', '#cc00ff'];
-        const grid = reactive([]);
-        const particles = reactive([]);
-        const hasMoved = reactive([]);
+        let currentThinkingWorker = null;
+        let watchdogTimer = null;
+        let lastBestMove = null;
+        const failureCount = ref(0);
+        const MAX_RETRYS = 3;
 
-        // --- Computed Properties ---
-        const currentHex = computed(() => colors[currentPlayer.value]);
-
-        const activeThemeName = computed(() => {
-            if (themeSetting.value !== 'system') return themeSetting.value;
-            return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        const settings = reactive({
+            mode: JSON.parse(localStorage.getItem('cr_v6'))?.mode || 'cpu',
+            difficulty: JSON.parse(localStorage.getItem('cr_v6'))?.difficulty || 4,
+            size: JSON.parse(localStorage.getItem('cr_v6'))?.size || 'medium',
+            theme: JSON.parse(localStorage.getItem('cr_v6'))?.theme || 'system'
         });
 
-        const themeColors = computed(() => THEME_MAP[activeThemeName.value]);
+        const turn = ref(0);
+        const players = ref([]);
+        const grid = ref([]);
+        const dims = ref({ r: 0, c: 0 });
+        const cellSize = ref(0);
+        const hasMoved = ref([]);
 
-        // --- Surgical Watchers ---
-        watch(activeThemeName, (newTheme) => {
-            document.body.setAttribute('data-theme', newTheme);
-        }, { immediate: true });
+        const setTheme = (val) => { settings.theme = val; applyTheme(val); };
+        const applyTheme = (t) => {
+            let target = t === 'system' ? (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : t;
+            document.documentElement.setAttribute('data-theme', target);
+        };
+        watch(settings, (n) => localStorage.setItem('cr_v6', JSON.stringify(n)), { deep: true });
 
-        // --- Internal Utilities ---
-        const getCriticalMass = (r, c) => {
-            let mass = 4;
-            if (r === 0 || r === rows.value - 1) mass--;
-            if (c === 0 || c === cols.value - 1) mass--;
-            return mass;
+        const initGame = () => {
+            const s = { small: [6,6], medium: [9,6], large: [12,10] }[settings.size];
+            dims.value = { r: s[0], c: s[1] };
+            players.value = [{ name: 'PLAYER 1', color: '#ff4d4d' }, { name: settings.mode === 'cpu' ? 'AEGIS ENGINE' : 'PLAYER 2', color: '#4d79ff' }];
+            hasMoved.value = [false, false];
+            grid.value = Array.from({ length: dims.value.r }, () => Array.from({ length: dims.value.c }, () => ({ owner: -1, atoms: 0 })));
+            animations.value = [];
+            turn.value = 0; gameActive.value = true; showMenu.value = false; failureCount.value = 0;
+            setTimeout(resize, 50);
         };
 
-        const isGameInProgress = () => hasMoved.some(m => m) && !gameOver.value;
-
-        // --- Core Lifecycle Logic ---
-        const initGrid = () => {
-            const canvas = board.value;
-            if (!canvas) return;
-            const availableW = window.innerWidth * 0.9;
-            const availableH = (window.innerHeight - 80) * 0.85;
-            cellSize.value = Math.min(availableW / cols.value, availableH / rows.value, 60);
-            canvas.width = cols.value * cellSize.value;
-            canvas.height = rows.value * cellSize.value;
-
-            grid.length = 0;
-            for (let r = 0; r < rows.value; r++) {
-                grid[r] = [];
-                for (let c = 0; c < cols.value; c++) grid[r][c] = { owner: -1, atoms: 0 };
-            }
+        const handleAIHalt = () => {
+            clearAIOrchestration();
+            failureCount.value++;
+            if (failureCount.value < MAX_RETRYS) runAI();
+            else finalizeAIMove(lastBestMove || findFirstValidMove());
         };
 
-        const resetGame = () => {
-            initGrid();
-            currentPlayer.value = 0;
-            hasMoved.length = 0;
-            hasMoved.push(...new Array(playerCount.value).fill(false));
-            gameOver.value = false;
-            isAnimating.value = false;
-            particles.length = 0;
+        const clearAIOrchestration = () => {
+            if (watchdogTimer) clearInterval(watchdogTimer);
+            if (currentThinkingWorker) currentThinkingWorker.terminate();
+            watchdogTimer = null; currentThinkingWorker = null;
         };
 
-        // --- Event Handlers ---
-        const handleNewGameRequest = () => {
-            if (isGameInProgress() && !confirm("Abandon current match and change settings?")) return;
-            showModal.value = true;
-            isSidebarOpen.value = false;
+        const findFirstValidMove = () => {
+            for (let r=0; r<dims.value.r; r++) for (let c=0; c<dims.value.c; c++) 
+                if (grid.value[r][c].owner === -1 || grid.value[r][c].owner === 1) return {r, c};
         };
 
-        const quickReset = () => {
-            if (isGameInProgress() && !confirm("Reset the current board?")) return;
-            isSidebarOpen.value = false;
-            resetGame();
+        const finalizeAIMove = (move) => {
+            isThinking.value = false; cpuTarget.value = { x: move.c, y: move.r };
+            setTimeout(() => { cpuTarget.value = null; execute(move.r, move.c); }, 600);
         };
 
-        const confirmNewGame = () => {
-            playerCount.value = tempPlayers.value;
-            const sizeMap = { small: [6, 6], medium: [9, 6], large: [12, 10] };
-            [rows.value, cols.value] = sizeMap[tempSize.value];
-            showModal.value = false;
-            resetGame();
+        const runAI = () => {
+            isThinking.value = true; lastBestMove = null;
+            const blob = new Blob([document.getElementById('worker-script').textContent], { type: 'application/javascript' });
+            currentThinkingWorker = new Worker(URL.createObjectURL(blob));
+            const startTime = Date.now();
+            watchdogTimer = setInterval(() => { if (Date.now() - startTime > 4500) handleAIHalt(); }, 200);
+            currentThinkingWorker.onmessage = (e) => {
+                if (e.data.type === 'INTERIM') lastBestMove = e.data.move;
+                else if (e.data.type === 'FINAL') { clearAIOrchestration(); finalizeAIMove(e.data.move); }
+            };
+            currentThinkingWorker.postMessage({ grid: JSON.parse(JSON.stringify(grid.value)), playerId: 1, rows: dims.value.r, cols: dims.value.c, difficulty: settings.difficulty });
         };
 
-        const handleExplosion = async (r, c, playerId) => {
-            if (gameOver.value) return;
-            const cell = grid[r][c];
-            if (cell.atoms < getCriticalMass(r, c)) return;
-
-            cell.atoms = 0; cell.owner = -1;
-
-            const neighbors = [[r-1, c], [r+1, c], [r, c-1], [r, c+1]];
-            const activeMoves = neighbors
-                .filter(([nr, nc]) => nr >= 0 && nr < rows.value && nc >= 0 && nc < cols.value)
-                .map(([nr, nc]) => ({
-                    x: c * cellSize.value + cellSize.value/2,
-                    y: r * cellSize.value + cellSize.value/2,
-                    targetR: nr, targetC: nc, reached: false
-                }));
-
-            particles.push(...activeMoves);
-
-            await new Promise(res => {
-                const check = setInterval(() => {
-                    activeMoves.forEach(p => {
-                        const tx = p.targetC * cellSize.value + cellSize.value/2;
-                        const ty = p.targetR * cellSize.value + cellSize.value/2;
-                        p.x += (tx - p.x) * 0.35; p.y += (ty - p.y) * 0.35;
-                        if (Math.hypot(tx - p.x, ty - p.y) < 2) { p.x = tx; p.y = ty; p.reached = true; }
-                    });
-                    if (activeMoves.every(p => p.reached)) { clearInterval(check); res(); }
-                }, 16);
-            });
-
-            for (let p of activeMoves) {
-                const target = grid[p.targetR][p.targetC];
-                target.owner = playerId;
-                target.atoms++;
-                const idx = particles.indexOf(p);
-                if (idx > -1) particles.splice(idx, 1);
-            }
-
-            // Winner Detection
-            const owners = new Set();
-            grid.forEach(row => row.forEach(col => { if(col.owner !== -1) owners.add(col.owner) }));
-            if (hasMoved.every(m => m) && owners.size === 1) {
-                gameOver.value = true;
-                isAnimating.value = false;
-                particles.length = 0;
-                showModal.value = true;
-                return;
-            }
-
-            for (let p of activeMoves) if (!gameOver.value) await handleExplosion(p.targetR, p.targetC, playerId);
+        const resize = () => {
+            if (!board.value) return;
+            cellSize.value = Math.min((window.innerWidth - 40) / dims.value.c, (window.innerHeight - 150) / dims.value.r, 75);
+            board.value.width = dims.value.c * cellSize.value; board.value.height = dims.value.r * cellSize.value;
         };
 
-        const handleTap = async (e) => {
-            if (isAnimating.value || gameOver.value || showModal.value) return;
+        const handleInput = (e) => {
+            if (!gameActive.value || isThinking.value || animations.value.length > 0) return;
             const rect = board.value.getBoundingClientRect();
-            const c = Math.floor((e.clientX - rect.left) / cellSize.value);
-            const r = Math.floor((e.clientY - rect.top) / cellSize.value);
+            const x = Math.floor((e.clientX - rect.left) / cellSize.value), y = Math.floor((e.clientY - rect.top) / cellSize.value);
+            if (y >= 0 && y < dims.value.r && x >= 0 && x < dims.value.c) {
+                if (grid.value[y][x].owner === -1 || grid.value[y][x].owner === turn.value) execute(y, x);
+            }
+        };
 
-            if (r >= 0 && r < rows.value && c >= 0 && c < cols.value) {
-                const cell = grid[r][c];
-                if (cell.owner === -1 || cell.owner === currentPlayer.value) {
-                    isAnimating.value = true;
-                    cell.owner = currentPlayer.value;
-                    cell.atoms++;
-                    hasMoved[currentPlayer.value] = true;
-                    await handleExplosion(r, c, currentPlayer.value);
-                    
-                    if (!gameOver.value) {
-                        do { currentPlayer.value = (currentPlayer.value + 1) % playerCount.value; } 
-                        while (hasMoved[currentPlayer.value] && !grid.some(row => row.some(c => c.owner === currentPlayer.value)));
-                        isAnimating.value = false;
+        const execute = async (r, c) => {
+            grid.value[r][c].owner = turn.value; grid.value[r][c].atoms++;
+            hasMoved.value[turn.value] = true;
+            await processChain();
+            if (checkWin()) return;
+            do { turn.value = (turn.value + 1) % 2; } while (hasMoved.value[turn.value] && !isPlayerAlive(turn.value));
+            if (settings.mode === 'cpu' && turn.value === 1) runAI();
+        };
+
+        const isPlayerAlive = (pid) => {
+            for (let r = 0; r < dims.value.r; r++) for (let c = 0; c < dims.value.c; c++) if (grid.value[r][c].owner === pid) return true;
+            return false;
+        };
+
+        const processChain = async () => {
+            let exploding = true;
+            while (exploding) {
+                exploding = false; const targets = [];
+                for (let r = 0; r < dims.value.r; r++) {
+                    for (let c = 0; c < dims.value.c; c++) {
+                        const cell = grid.value[r][c];
+                        let limit = (r === 0 || r === dims.value.r - 1 ? 3 : 4);
+                        if (c === 0 || c === dims.value.c - 1) limit--;
+                        if (cell.atoms >= limit) { exploding = true; targets.push({ r, c, owner: turn.value }); }
                     }
                 }
+                if (exploding) {
+                    for (const t of targets) {
+                        grid.value[t.r][t.c].atoms = 0; grid.value[t.r][t.c].owner = -1;
+                        const neighbors = [[t.r-1,t.c],[t.r+1,t.c],[t.r,t.c-1],[t.r,t.c+1]].filter(([nr,nc]) => nr>=0 && nr<dims.value.r && nc>=0 && nc<dims.value.c);
+                        neighbors.forEach(([nr, nc]) => { animations.value.push({ sr: t.r, sc: t.c, tr: nr, tc: nc, p: 0, owner: t.owner }); });
+                    }
+                    await new Promise(res => { const check = setInterval(() => { if (animations.value.length === 0) { clearInterval(check); res(); } }, 16); });
+                }
+                if (hasMoved.value[0] && hasMoved.value[1]) {
+                    if (!isPlayerAlive(0) || !isPlayerAlive(1)) break;
+                }
             }
+        };
+
+        const checkWin = () => {
+            if (!hasMoved.value[0] || !hasMoved.value[1]) return false;
+            const p1 = isPlayerAlive(0), p2 = isPlayerAlive(1);
+            if (!p1 || !p2) { setTimeout(() => { alert("VICTOR: " + (p1 ? players.value[0].name : players.value[1].name)); gameActive.value = false; showMenu.value = true; }, 200); return true; }
+            return false;
         };
 
         const draw = () => {
-            const canvas = board.value;
-            const ctx = canvas?.getContext('2d');
-            if (!ctx) return;
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Grid rendering
-            ctx.strokeStyle = themeColors.value.gridLine;
-            ctx.lineWidth = 1;
-            for(let i=0; i<=cols.value; i++) { 
-                ctx.beginPath(); ctx.moveTo(i * cellSize.value, 0); ctx.lineTo(i * cellSize.value, canvas.height); ctx.stroke(); 
-            }
-            for(let i=0; i<=rows.value; i++) { 
-                ctx.beginPath(); ctx.moveTo(0, i * cellSize.value); ctx.lineTo(canvas.width, i * cellSize.value); ctx.stroke(); 
-            }
-
-            // Atoms rendering
-            grid.forEach((row, r) => row.forEach((cell, c) => {
-                if (cell.atoms > 0) {
-                    ctx.fillStyle = colors[cell.owner];
-                    const cx = c * cellSize.value + cellSize.value/2, cy = r * cellSize.value + cellSize.value/2;
+            const ctx = board.value?.getContext('2d'); if (!ctx) return requestAnimationFrame(draw);
+            ctx.clearRect(0, 0, board.value.width, board.value.height);
+            const style = getComputedStyle(document.documentElement); ctx.strokeStyle = style.getPropertyValue('--border').trim();
+            for(let i=0; i<=dims.value.c; i++) { ctx.beginPath(); ctx.moveTo(i*cellSize.value, 0); ctx.lineTo(i*cellSize.value, board.value.height); ctx.stroke(); }
+            for(let i=0; i<=dims.value.r; i++) { ctx.beginPath(); ctx.moveTo(0, i*cellSize.value); ctx.lineTo(board.value.width, i*cellSize.value); ctx.stroke(); }
+            grid.value.forEach((row, r) => row.forEach((cell, c) => {
+                if(cell.atoms > 0) {
+                    const cx = c*cellSize.value + cellSize.value/2, cy = r*cellSize.value + cellSize.value/2;
+                    ctx.fillStyle = players.value[cell.owner]?.color;
                     for(let i=0; i<cell.atoms; i++) {
-                        const angle = (Date.now() / 600) + (i * (Math.PI * 2 / cell.atoms));
-                        const d = cell.atoms > 1 ? cellSize.value/5 : 0;
-                        ctx.beginPath(); ctx.arc(cx + Math.cos(angle)*d, cy + Math.sin(angle)*d, cellSize.value/5.5, 0, Math.PI * 2); ctx.fill();
+                        const a = (Date.now()/380) + (i*Math.PI*2/cell.atoms);
+                        const d = cell.atoms > 1 ? cellSize.value/6 : 0;
+                        ctx.beginPath(); ctx.arc(cx+Math.cos(a)*d, cy+Math.sin(a)*d, cellSize.value/7.5, 0, Math.PI*2); ctx.fill();
                     }
                 }
             }));
-
-            // Animation particles
-            particles.forEach(p => {
-                ctx.fillStyle = currentHex.value;
-                ctx.beginPath(); ctx.arc(p.x, p.y, cellSize.value/4.5, 0, Math.PI * 2); ctx.fill();
-            });
-
+            for (let i = animations.value.length - 1; i >= 0; i--) {
+                const anim = animations.value[i]; anim.p += 0.12;
+                if (anim.p >= 1) { grid.value[anim.tr][anim.tc].owner = anim.owner; grid.value[anim.tr][anim.tc].atoms++; animations.value.splice(i, 1); continue; }
+                const curX = (anim.sc * cellSize.value + cellSize.value/2) + ((anim.tc - anim.sc) * cellSize.value) * anim.p;
+                const curY = (anim.sr * cellSize.value + cellSize.value/2) + ((anim.tr - anim.sr) * cellSize.value) * anim.p;
+                ctx.fillStyle = players.value[anim.owner]?.color; ctx.beginPath(); ctx.arc(curX, curY, cellSize.value/7.5, 0, Math.PI*2); ctx.fill();
+            }
             requestAnimationFrame(draw);
         };
 
-        onMounted(() => {
-            window.addEventListener('resize', initGrid);
-            initGrid();
-            draw();
-        });
-
-        return { 
-            board, themeSetting, activeThemeName, themeColors, isSidebarOpen, showModal, 
-            gameOver, currentPlayer, currentHex, tempPlayers, tempSize, 
-            handleNewGameRequest, confirmNewGame, quickReset, handleTap 
-        };
+        onMounted(() => { window.addEventListener('resize', resize); applyTheme(settings.theme); draw(); });
+        return { board, settings, showMenu, gameActive, players, turn, isThinking, cpuTarget, handleInput, initGame, setTheme, cpuTargetStyle: computed(() => { if(!cpuTarget.value || !board.value) return {}; return { left: (board.value.offsetLeft + cpuTarget.value.x * cellSize.value) + 'px', top: (board.value.offsetTop + cpuTarget.value.y * cellSize.value) + 'px', width: cellSize.value + 'px', height: cellSize.value + 'px' }; }) };
     }
 }).mount('#app');
 </script>
